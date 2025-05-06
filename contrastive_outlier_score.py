@@ -33,7 +33,8 @@ def _prepare_distance_function(metric: Union[str, Callable[[np.ndarray, np.ndarr
             return lambda x, y: 1 - overlap_similarity(x, y)
         elif metric == 'eskin':
             return eskin_distance
-        elif metric in {'hamming', 'jaccard', 'cosine', 'euclidean', 'manhattan', 'cityblock', 'chebyshev', 'minkowski', 'braycurtis'}:
+        elif metric in {'hamming', 'jaccard', 'cosine', 'euclidean', 'manhattan', 'cityblock', 'chebyshev', 'minkowski',
+                        'braycurtis'}:
             return metric
         else:
             raise ValueError(f"Unsupported metric: {metric}")

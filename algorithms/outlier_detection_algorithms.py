@@ -12,7 +12,7 @@ import warnings
 warnings.simplefilter('ignore')
 
 
-def HDBSCAN(df_ohe: np.ndarray) -> Optional[Tuple[hdbscan.HDBSCAN, dict, np.ndarray]]:
+def HyperHDBSCAN(df_ohe: np.ndarray) -> Optional[Tuple[hdbscan.HDBSCAN, dict, np.ndarray]]:
     """
     Perform HDBSCAN clustering with hyperparameter tuning using a grid search approach.
 
@@ -61,7 +61,7 @@ def HDBSCAN(df_ohe: np.ndarray) -> Optional[Tuple[hdbscan.HDBSCAN, dict, np.ndar
     return None
 
 
-def IsolationForest(df_ohe: np.ndarray, out_num: float) -> Optional[Tuple[IsolationForest, dict, np.ndarray]]:
+def HyperIF(df_ohe: np.ndarray, out_num: float) -> Optional[Tuple[IsolationForest, dict, np.ndarray]]:
     """
     Perform Isolation Forest anomaly detection with hyperparameter tuning using a grid search approach.
 
@@ -123,7 +123,7 @@ def IsolationForest(df_ohe: np.ndarray, out_num: float) -> Optional[Tuple[Isolat
     return None
 
 
-def LOF(df_ohe: np.ndarray, out_num: float) -> Optional[Tuple[LocalOutlierFactor, dict, np.ndarray]]:
+def HyperLOF(df_ohe: np.ndarray, out_num: float) -> Optional[Tuple[LocalOutlierFactor, dict, np.ndarray]]:
     """
     Perform Local Outlier Factor (LOF) anomaly detection with hyperparameter tuning using a grid search approach.
 
@@ -182,7 +182,7 @@ def LOF(df_ohe: np.ndarray, out_num: float) -> Optional[Tuple[LocalOutlierFactor
     return None
 
 
-def CBLOF(df_ohe: np.ndarray, out_num: float) -> Optional[Tuple[dict, CBLOF, np.ndarray]]:
+def HyperCBLOF(df_ohe: np.ndarray, out_num: float) -> Optional[Tuple[dict, CBLOF, np.ndarray]]:
     """
     Perform CBLOF (Cluster-based Local Outlier Factor) anomaly detection with hyperparameter tuning using a grid search approach.
 
@@ -216,34 +216,27 @@ def CBLOF(df_ohe: np.ndarray, out_num: float) -> Optional[Tuple[dict, CBLOF, np.
     best_cblof_score = -np.inf
 
     for params in ParameterGrid({
-        'n_clusters': list(range(2, 30)),
+        'n_clusters': list(range(3, 30)),
         'contamination': [out_perc],
         'alpha': [0.6, 0.7, 0.8, 0.9],
         'beta': [2, 5]
     }):
-        print(params)
-        try:
-            cblof = CBLOF(random_state=42, **params)
-            cblof.fit(X)
-            preds = cblof.labels_
+        cblof = CBLOF(random_state=42, **params)
+        cblof.fit(X)
+        preds = np.where(np.array(cblof.labels_) == 1, -1, 0)
 
-            if np.sum(preds == -1) < len(df_ohe) and np.sum(preds != -1) < len(df_ohe):
-                score = contrastive_outlier_score(X, preds, metric='hamming')
+        if np.sum(preds == -1) < len(df_ohe) and np.sum(preds != -1) < len(df_ohe):
+            score = contrastive_outlier_score(X, preds, metric='hamming')
 
-                if score > best_cblof_score:
-                    best_cblof_score = score
-                    best_cblof = cblof
-                    best_params = params
-        except:
-            continue
+            if score > best_cblof_score:
+                best_cblof_score = score
+                best_cblof = cblof
+                best_params = params
 
     if best_cblof:
-        labels = best_cblof.labels_
+        labels = np.array(best_cblof.labels_)
+        labels = np.where(labels == 1, -1, 0)
         return best_params, best_cblof, labels
-
-    return None
-
-
 
 
 if __name__ == "__main__":

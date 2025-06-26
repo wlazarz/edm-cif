@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from object_distances import eskin_distance, overlap_distance
+from evaluation.object_distances import eskin_distance, overlap_distance
 from sklearn.metrics import silhouette_score, calinski_harabasz_score, davies_bouldin_score
 from scipy.spatial.distance import pdist, cdist
 from collections import Counter

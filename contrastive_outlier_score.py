@@ -2,22 +2,52 @@ import numpy as np
 import pandas as pd
 from typing import Callable, Union, List
 from sklearn.metrics import pairwise_distances
-from scipy.spatial.distance import (
-    hamming, jaccard, cosine, euclidean, cityblock, braycurtis, chebyshev, minkowski
-)
 
 
 def eskin_distance(x: np.ndarray, y: np.ndarray) -> float:
     """
-    Compute Eskin distance between two categorical vectors.
+    Compute the Eskin distance between two categorical vectors.
+
+    The Eskin distance is a measure of dissimilarity between two categorical vectors,
+    with higher penalties for mismatches in attributes with many unique values.
+    It is calculated as the sum of 1 / (10 + frequency) for each differing feature,
+    where frequency is set to 1 for all features here.
+
+    Parameters:
+    ----------
+    x : np.ndarray
+        A 1D numpy array representing the first categorical vector.
+
+    y : np.ndarray
+        A 1D numpy array representing the second categorical vector.
+
+    Returns:
+    -------
+    float
+        The Eskin distance between the two vectors.
     """
     m = len(x)
-    return sum([0 if xi == yi else 10 / (10 + freq) for xi, yi, freq in zip(x, y, [1]*m)])
+    return sum([0 if xi == yi else 10 / (10 + freq) for xi, yi, freq in zip(x, y, [1] * m)])
 
 
 def overlap_similarity(x: np.ndarray, y: np.ndarray) -> float:
     """
-    Compute overlap similarity between two vectors.
+    Compute the overlap similarity between two vectors.
+
+    The overlap similarity is the ratio of matching elements in the two vectors to the total number of elements.
+
+    Parameters:
+    ----------
+    x : np.ndarray
+        A 1D numpy array representing the first vector.
+
+    y : np.ndarray
+        A 1D numpy array representing the second vector.
+
+    Returns:
+    -------
+    float
+        The overlap similarity between the two vectors (range [0, 1]).
     """
     return sum([1 if xi == yi else 0 for xi, yi in zip(x, y)]) / len(x)
 
@@ -25,7 +55,26 @@ def overlap_similarity(x: np.ndarray, y: np.ndarray) -> float:
 def _prepare_distance_function(metric: Union[str, Callable[[np.ndarray, np.ndarray], float]]) \
         -> Union[str, Callable[[np.ndarray, np.ndarray], float]]:
     """
-    Select the appropriate distance function based on input.
+    Select the appropriate distance function based on the input.
+
+    If the `metric` is a string, the function selects a built-in distance function or an Eskin-based metric.
+    If the `metric` is already a callable function, it is returned as is.
+
+    Parameters:
+    ----------
+    metric : Union[str, Callable[[np.ndarray, np.ndarray], float]]
+        The metric used to compute distances. It can either be a string (e.g., 'overlap', 'eskin', or others)
+        or a user-provided callable function.
+
+    Returns:
+    -------
+    Union[str, Callable[[np.ndarray, np.ndarray], float]]
+        The appropriate distance function corresponding to the input metric.
+
+    Raises:
+    ------
+    ValueError
+        If the provided metric is not recognized or supported.
     """
     if isinstance(metric, str):
         metric = metric.lower()
@@ -45,6 +94,25 @@ def _compute_distances(outliers: np.ndarray, inliers: np.ndarray,
                        dist_func: Union[str, Callable[[np.ndarray, np.ndarray], float]]) -> np.ndarray:
     """
     Compute pairwise distances between outliers and inliers.
+
+    This function computes distances between each pair of outlier and inlier using the provided distance function.
+
+    Parameters:
+    ----------
+    outliers : np.ndarray
+        A 2D numpy array where each row is an outlier.
+
+    inliers : np.ndarray
+        A 2D numpy array where each row is an inlier.
+
+    dist_func : Union[str, Callable[[np.ndarray, np.ndarray], float]]
+        The distance function or string that defines the metric to compute the pairwise distances. It can be a built-in
+        string metric (e.g., 'euclidean', 'manhattan', etc.) or a custom distance function.
+
+    Returns:
+    -------
+    np.ndarray
+        A 2D numpy array of pairwise distances between each outlier and inlier.
     """
     if callable(dist_func):
         return np.array([[dist_func(ox, iy) for iy in inliers] for ox in outliers])
@@ -54,6 +122,36 @@ def _compute_distances(outliers: np.ndarray, inliers: np.ndarray,
 def _aggregate_scores(distances: np.ndarray, inlier_labels: np.ndarray, strategy: str, n: int) -> List[float]:
     """
     Aggregate distance scores using the selected strategy.
+
+    This function computes aggregated distance scores for each data point in the outlier set based on the specified
+    strategy. The strategies supported are:
+    - 'average': Compute the average distance.
+    - 'median': Compute the median distance.
+    - 'n_closest': Compute the average of the `n` closest distances within each inlier cluster.
+
+    Parameters:
+    ----------
+    distances : np.ndarray
+        A 2D numpy array where each row represents the distances between an outlier and all inliers.
+
+    inlier_labels : np.ndarray
+        A 1D numpy array containing the labels of the inliers, used to group distances by inlier cluster.
+
+    strategy : str
+        The aggregation strategy to use. Options are 'average', 'median', or 'n_closest'.
+
+    n : int
+        The number of closest distances to consider for the 'n_closest' strategy.
+
+    Returns:
+    -------
+    List[float]
+        A list of aggregated scores for each outlier, one score per outlier.
+
+    Raises:
+    ------
+    ValueError
+        If the provided strategy is not recognized.
     """
     scores = []
     for dist_row in distances:
@@ -71,7 +169,27 @@ def _aggregate_scores(distances: np.ndarray, inlier_labels: np.ndarray, strategy
 
 def _n_closest_score(dist_row: np.ndarray, inlier_labels: np.ndarray, n: int) -> float:
     """
-    Compute average of n closest distances per inlier cluster.
+    Compute the average of the `n` closest distances per inlier cluster.
+
+    This function computes the average of the `n` smallest distances within each inlier cluster, where `n` is
+    the number of closest distances to consider. The distances are grouped by inlier cluster, and the `n` smallest
+    distances within each cluster are selected for averaging.
+
+    Parameters:
+    ----------
+    dist_row : np.ndarray
+        A 1D numpy array representing the distances between a specific outlier and all inliers.
+
+    inlier_labels : np.ndarray
+        A 1D numpy array containing the labels of the inliers, used to group distances by inlier cluster.
+
+    n : int
+        The number of closest distances to consider for each inlier cluster.
+
+    Returns:
+    -------
+    float
+        The average of the `n` closest distances across all inlier clusters.
     """
     cluster_scores = []
     for label in np.unique(inlier_labels):
@@ -81,16 +199,13 @@ def _n_closest_score(dist_row: np.ndarray, inlier_labels: np.ndarray, n: int) ->
         k = min(n, len(cluster_distances))
         closest = np.partition(cluster_distances, k - 1)[:k]
         cluster_scores.extend(closest)
+
     return np.mean(cluster_scores) if cluster_scores else np.nan
 
 
-def contrastive_outlier_score(
-    df: Union[pd.DataFrame, np.ndarray],
-    labels: np.ndarray,
-    metric: Union[str, Callable[[np.ndarray, np.ndarray], float]] = 'cosine',
-    strategy: str = 'average',
-    n: int = 5
-) -> float:
+def contrastive_outlier_score(df: Union[pd.DataFrame, np.ndarray], labels: np.ndarray,
+                              metric: Union[str, Callable[[np.ndarray, np.ndarray], float]] = 'cosine',
+                              strategy: str = 'average', n: int = 5) -> float:
     """
     Calculate the Contrastive Outlier Score (COS) for evaluating how distinct outliers are from inliers.
 
@@ -126,13 +241,3 @@ def contrastive_outlier_score(
 
     return round(float(np.nanmean(scores)), 4)
 
-
-def one_hot_encoding(df):
-    ohe_data = df.copy()
-    for c in ohe_data.columns:
-        col_mode = df[c].mode().values[0]
-        df[c].fillna(col_mode, inplace=True)
-        color_encoded = pd.get_dummies(ohe_data[c], prefix=c)
-        ohe_data = pd.concat([ohe_data, color_encoded], axis=1).drop(columns=[c])
-
-    return ohe_data

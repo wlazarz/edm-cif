@@ -14,7 +14,7 @@
 ## Quick Start
 
 ```python
-from edm_cif import CategoricalIsolationForest
+from algorithms.edm_cif import CategoricalIsolationForest
 import pandas as pd
 
 # Example categorical dataset
